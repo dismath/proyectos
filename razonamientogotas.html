@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego Matemático</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background-color: #87CEEB; /* Color de fondo cielo */
+        }
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+        }
+        #score, #problemLabel, #levelLabel {
+            position: absolute;
+            color: white;
+            font-size: 24px;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        #score {
+            top: 10px;
+            left: 10px;
+        }
+        #problemLabel {
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+        }
+        #levelLabel {
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+        }
+        #pauseButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+            font-size: 24px;
+             background-color: #FF6347;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+   #pauseButton:hover {
+            background-color: #FF4500;
+        }
+
+        #pauseMenu, #endScreen, #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        #pauseMenu button, #endScreen button, #startScreen button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 24px;
+                background-color: #32CD32;
+            border: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        #pauseMenu button:hover, #endScreen button:hover, #startScreen button:hover {
+            background-color: #228B22;
+        }
+        #pauseMenu p, #endScreen p, #startScreen p {
+            font-size: 30px;
+        }
+
+           #problemText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: black;
+            font-size: 24px;
+            z-index: 1;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">Puntaje: 0</div>
+    <div id="problemLabel">Esperando problema...</div>
+    <div id="levelLabel">Nivel: 1 / 5</div>
+    <button id="pauseButton">Pausa</button>
+
+    <!-- Menú de Pausa -->
+    <div id="pauseMenu">
+        <p>Pausado</p>
+        <button id="resumeButton">Continuar</button>
+        <button id="restartButton">Reiniciar</button>
+        <button id="toggleAudioButton">Silenciar</button>
+        <button id="exitGameButton">Salir</button>
+    </div>
+
+    <!-- Pantalla de Fin -->
+    <div id="endScreen">
+        <p>Puntaje Final: <span id="finalScore">0</span></p>
+        <button id="restartGameButton">Reiniciar Juego</button>
+        <button id="exitGameButton">Salir</button>
+    </div>
+
+    <!-- Pantalla de Inicio -->
+    <div id="startScreen">
+        <p>¡Razonamiento Númerico!</p>
+       <h3 style="color:rgb(249, 231, 159 );"><center> Ejercita tus habilidades de razonamiento al elegir la respuesta correcta, dando clic en la gota de lluvia que tiene la respuesta</center></h3>
+        <button id="startButton">Entrenar</button>
+    </div>
+
+    <!-- Sonidos -->
+    <audio id="correctSound" src="sounds/correct.mp3"></audio>
+    <audio id="incorrectSound" src="sounds/incorrect.mp3"></audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const problemLabel = document.getElementById('problemLabel');
+        const levelLabel = document.getElementById('levelLabel');
+        const pauseButton = document.getElementById('pauseButton');
+        const pauseMenu = document.getElementById('pauseMenu');
+        const resumeButton = document.getElementById('resumeButton');
+        const restartButton = document.getElementById('restartButton');
+        const toggleAudioButton = document.getElementById('toggleAudioButton');
+        const endScreen = document.getElementById('endScreen');
+        const finalScoreElement = document.getElementById('finalScore');
+        const restartGameButton = document.getElementById('restartGameButton');
+        const exitGameButton = document.getElementById('exitGameButton');
+        const startScreen = document.getElementById('startScreen');
+        const startButton = document.getElementById('startButton');
+
+        // Sonidos
+        const correctSound = document.getElementById('correctSound');
+        const incorrectSound = document.getElementById('incorrectSound');
+
+        let drops = [];
+        let score = 0;
+        let currentProblem = null;
+        let correctAnswer = null;
+        let level = 1;
+        let currentExercise = 0;
+        let exercisesPerLevel = 5;
+        let isPaused = false;
+        let isMuted = false;
+        let dropImage = new Image();
+        dropImage.src = 'path_to_your_raindrop_image.png'; // Asegúrate de tener una imagen de gota de lluvia en esta ruta
+
+        const DROP_SPEED = 0.2; // Velocidad constante de caída de las gotas
+        const EXERCISE_INTERVAL = 00; // Intervalo de tiempo para generar nuevos ejercicios (en milisegundos)
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function getDifficultySettings(level) {
+            return {
+                num1Max: 10 + (level - 1) * 10,
+                num2Max: 10 + (level - 1) * 10,
+                numOptions: Math.min(6, 2 + level)
+            };
+        }
+
+        function generateMathProblem(level) {
+            const settings = getDifficultySettings(level);
+            const num1 = Math.floor(Math.random() * settings.num1Max) + 1;
+            const num2 = Math.floor(Math.random() * settings.num2Max) + 1;
+            const operators = ['+', '-', '*', '/'];
+            const operator = operators[Math.floor(Math.random() * operators.length)];
+            let answer;
+            
+            switch (operator) {
+                case '+': answer = num1 + num2; break;
+                case '-': answer = num1 - num2; break;
+                case '*': answer = num1 * num2; break;
+                case '/': answer = (num1 / num2).toFixed(2); break;
+            }
+            
+            return {
+                problem: `${num1} ${operator} ${num2}`,
+                answer: answer.toString()
+            };
+        }
+
+        function generateIncorrectAnswers(correctAnswer, count) {
+            const incorrectAnswers = new Set();
+            while (incorrectAnswers.size < count) {
+                let wrongAnswer;
+                do {
+                    wrongAnswer = (Math.random() * 100).toFixed(2);
+                } while (wrongAnswer === correctAnswer || incorrectAnswers.has(wrongAnswer));
+                incorrectAnswers.add(wrongAnswer);
+            }
+            return Array.from(incorrectAnswers);
+        }
+
+        function createDrops(level) {
+            drops.length = 0;
+            const settings = getDifficultySettings(level);
+            const allAnswers = generateIncorrectAnswers(correctAnswer, settings.numOptions - 1);
+            allAnswers.push(correctAnswer);
+            allAnswers.sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < settings.numOptions; i++) {
+                drops.push({
+                    x: Math.random() * canvas.width,
+                    y: -Math.random() * canvas.height,
+                    width: 50,
+                    height: 50,
+                    problem: allAnswers[i % allAnswers.length],
+                    speed: DROP_SPEED,
+                    isFalling: true
+                });
+            }
+        }
+
+        function updateLevel() {
+            levelLabel.textContent = `Nivel: ${level} / 5`;
+        }
+
+        function startGame() {
+            startScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            currentExercise = 0;
+            score = 0;
+            level = 1;
+            updateLevel();
+            nextExercise();
+        }
+
+        function nextExercise() {
+            if (currentExercise >= exercisesPerLevel) {
+                if (level >= 5) {
+                    endGame();
+                    return;
+                }
+                level++;
+                updateLevel();
+                currentExercise = 0;
+            }
+            const mathProblem = generateMathProblem(level);
+            currentProblem = mathProblem;
+            correctAnswer = mathProblem.answer;
+            problemLabel.textContent = `Problema: ${currentProblem.problem}`;
+            createDrops(level);
+            drawDrops();
+            currentExercise++;
+        }
+
+        function drawDrops() {
+            if (isPaused) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(10, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+           
+            drops.forEach(drop => {
+                if (drop.isFalling) {
+                    ctx.drawImage(dropImage, drop.x, drop.y, drop.width, drop.height);
+                    ctx.font = '20px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(drop.problem, drop.x + drop.width / 2, drop.y + drop.height / 2 + 10);
+                    drop.y += drop.speed;
+                    if (drop.y > canvas.height) {
+                        drop.y = -drop.height;
+                        drop.x = Math.random() * canvas.width;
+                        drop.problem = generateIncorrectAnswers(correctAnswer, 1)[0];
+                    }
+                }
+            });
+            requestAnimationFrame(drawDrops);
+        }
+        function handleDropClick(drop) {
+            if (drop.problem === correctAnswer) {
+                score += 10;
+                if (!isMuted) correctSound.play();
+            } else {
+                score -= 5;
+                if (!isMuted) incorrectSound.play();
+            }
+            scoreElement.textContent = `Puntaje: ${score}`;
+            nextExercise();
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (isPaused) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            drops.forEach(drop => {
+                if (drop.isFalling && x > drop.x && x < drop.x + drop.width && y > drop.y && y < drop.y + drop.height) {
+                    handleDropClick(drop);
+                }
+            });
+        });
+
+        function endGame() {
+            finalScoreElement.textContent = score;
+            endScreen.style.display = 'flex';
+            canvas.style.display = 'none';
+        }
+
+        pauseButton.addEventListener('click', () => {
+            if (isPaused) return;
+            isPaused = true;
+            pauseMenu.style.display = 'flex';
+            canvas.style.display = 'none';
+        });
+
+        resumeButton.addEventListener('click', () => {
+            if (!isPaused) return;
+            isPaused = false;
+            pauseMenu.style.display = 'none';
+            canvas.style.display = 'block';
+            drawDrops();
+        });
+
+        restartButton.addEventListener('click', () => {
+            window.location.reload(); // Recargar la página para reiniciar completamente el juego
+        });
+
+        toggleAudioButton.addEventListener('click', () => {
+            isMuted = !isMuted;
+            toggleAudioButton.textContent = isMuted ? 'Activar Audio' : 'Silenciar';
+        });
+
+        restartGameButton.addEventListener('click', () => {
+            window.location.reload(); // Recargar la página para reiniciar completamente el juego
+        });
+
+        exitGameButton.addEventListener('click', () => {
+            window.location.href = 'https://example.com'; // Redirigir a una página específica
+        });
+
+        startButton.addEventListener('click', () => {
+            startGame();
+        });
+
+        // Mostrar la ventana emergente de inicio al cargar la página
+        window.addEventListener('load', () => {
+            startScreen.style.display = 'flex';
+        });
+    </script>
+</body>
+</html>
